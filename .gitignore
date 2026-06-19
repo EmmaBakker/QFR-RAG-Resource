@@ -1,0 +1,59 @@
+# ── macOS ──────────────────────────────────────────────────────────────────
+.DS_Store
+__MACOSX/
+
+# ── Python ─────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+.env
+*.env
+
+# ── Generated data, indexes, and run outputs ───────────────────────────────
+# These directories contain large binary files, corpora, embeddings, and
+# generated evaluation outputs that should not be committed to the repository.
+data/
+indexes/
+outputs/
+runs/
+
+# ── Model outputs and evaluation results ───────────────────────────────────
+generations.jsonl
+retrieval_traces.jsonl
+per_example_eval.jsonl
+per_example_eval*.jsonl
+global_summary.json
+adversarial_eval_per_item.csv
+
+# ── Secrets / credentials ───────────────────────────────────────────────────
+.env
+*.key
+secrets.json
+credentials.json
+
+# ── Jupyter ─────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── IDE / editor ────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── pytest / coverage ───────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
