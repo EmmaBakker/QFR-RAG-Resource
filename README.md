@@ -1,26 +1,39 @@
 # QFR-RAG
 
-This repository contains the official code and evaluation pipeline for **QFR-RAG**, a diagnostic evaluation resource for retrieval-augmented generation (RAG) in specialised technical-medical documentation.
+**QFR-RAG** is a diagnostic evaluation resource and reproducible experimental pipeline for retrieval-augmented generation (RAG) over specialised technical-medical documentation.
 
-QFR-RAG focuses on **Quantitative Flow Ratio (QFR)**, where answering questions often requires precise evidence from software documentation, angiographic acquisition requirements, methodological material and related clinical-technical sources.
+The resource focuses on **Quantitative Flow Ratio (QFR)**, a documentation-heavy setting where correct answers often require precise evidence about software use, angiographic acquisition constraints, methodological assumptions, and related coronary physiology concepts. The goal of this repository is not to build a clinical assistant, but to support controlled evaluation of retrieval, evidence use, grounded generation, abstention behaviour, citation grounding, and adversarial robustness.
 
-The repository accompanies the QFR-RAG research paper and includes code for:
+This repository accompanies the thesis:
 
-* preprocessing and corpus construction;
-* sparse and dense retrieval;
-* retrieval fusion;
-* reranking;
-* RAG answer generation;
-* oracle-evidence generation;
-* answer evaluation;
-* adversarial evaluation;
-* judge agreement and reliability analysis.
+> **QFR-RAG: A Multi-Level Evaluation Resource for Grounded RAG over Technical-Medical Documentation**
 
 The public dataset files are hosted separately on Hugging Face:
 
+```text
 https://huggingface.co/datasets/EmmaBakker4/QFR-RAG
+```
 
 The original QFR source documents are **not redistributed** in this repository or in the Hugging Face dataset.
+
+## What is included
+
+This repository contains code for:
+
+- preprocessing local source documents into section-aware corpus chunks;
+- building BM25 and dense retrieval indexes;
+- evaluating retrieval for Task A and Task B;
+- combining BM25 and dense retrieval through linear fusion;
+- reranking fused retrieval results with a Qwen3 reranker;
+- generating standard RAG answers from retrieved traces;
+- generating closed-book answers without retrieved evidence;
+- generating oracle-evidence answers from annotated gold evidence;
+- running full-corpus / citation-alias diagnostic generation;
+- evaluating Task A correctness and taxonomy;
+- evaluating Task B nugget recall, taxonomy, and optional RAGAS-style metrics;
+- evaluating adversarial robustness;
+- evaluating BioASQ validation runs;
+- computing inter-judge reliability from explicit judge-output pairs.
 
 ## Dataset
 
@@ -28,27 +41,30 @@ QFR-RAG contains three main components.
 
 ### Task A: Technical Extraction
 
-Task A contains 50 questions targeting specific technical facts from QFR-related documentation. These questions typically ask for precise parameters, definitions, procedural requirements, or software-specific constraints.
+Task A contains **50 questions** targeting exact technical facts from QFR-related documentation. These questions ask for precise parameters, definitions, procedural requirements, or software-specific constraints. Task A is evaluated with chunk-level gold evidence labels and reference-answer correctness.
 
-Task A is intended for evaluating exact evidence retrieval and documented answer correctness.
+### Task B: Multi-Evidence QFR Question Answering
 
-### Task B: Multi-Evidence Clinical/Technical QA
+Task B contains **50 questions** that require combining information from multiple pieces of evidence. These questions are phrased as realistic information needs from a QFR software user or someone learning about QFR methodology.
 
-Task B contains 50 questions that require combining information from multiple pieces of evidence. The questions are phrased as realistic information needs, for example from a user of QFR software or someone learning about QFR methodology.
+Task B contains:
 
-Task B contains 103 required evidence slots and 278 atomic answer nuggets. Evidence slots are used to evaluate whether retrieval covers the required evidence, while answer nuggets are used to evaluate whether generated answers contain the required information.
+- **103 required evidence slots** for retrieval sufficiency evaluation;
+- **278 atomic answer nuggets** for generation completeness evaluation.
+
+The slot annotations support retrieval-side diagnosis, while the nugget annotations support answer-side diagnosis.
 
 ### Adversarial Questions
 
-The adversarial component contains 300 paired questions derived from the base Task A and Task B questions. These examples are designed to test whether systems avoid unsupported or unsafe behaviour when a question should not simply be answered as stated.
+The adversarial component contains **300 paired questions** derived from the base Task A and Task B questions. These examples test whether systems avoid inappropriate answering when the question should not simply be answered as stated.
 
-The adversarial questions cover three categories:
+The adversarial categories are:
 
-* **Nonsensical questions:** questions that are incoherent, impossible, or not meaningful in the QFR context.
-* **False-premise questions:** questions that assume an incorrect or unsupported claim.
-* **Safety-critical questions:** questions that could lead to unsafe technical or clinical guidance if answered carelessly.
+- **Nonsensical questions:** incoherent, impossible, or meaningless questions in the QFR context;
+- **False-premise questions:** questions that assume an incorrect or unsupported claim;
+- **Safety-critical questions:** questions where careless answering could produce unsafe technical or clinical guidance.
 
-## Loading the Dataset
+## Loading the dataset
 
 The dataset can be loaded directly from Hugging Face with `datasets`:
 
@@ -69,7 +85,7 @@ huggingface-cli download EmmaBakker4/QFR-RAG \
   --local-dir qfr_datasets
 ```
 
-This should create a local directory with files such as:
+Expected local dataset layout:
 
 ```text
 qfr_datasets/
@@ -79,25 +95,29 @@ qfr_datasets/
 └── taskB_adversarial.jsonl
 ```
 
-## Source Documents
+## Source documents
 
-QFR-RAG was constructed from a curated collection of QFR-related technical-medical documents, including software documentation, release notes, educational material, angiography training material and QFR methodological literature.
+QFR-RAG was constructed from a curated corpus of QFR-related technical-medical material, including software documentation, release notes, educational material, angiography training material, and QFR methodological literature.
 
-The source documents were segmented into section-aware passages with stable passage identifiers. These identifiers are used across gold evidence labels, retrieval traces, generated citations and oracle evidence settings.
+The source documents were segmented into section-aware chunks with stable passage identifiers. These identifiers are used across gold evidence labels, retrieval traces, generated citations, and oracle-evidence settings.
 
-The full source documents are **not redistributed** in this repository or in the Hugging Face dataset. Users are responsible for obtaining and using any source documents in accordance with their original licenses and access conditions.
+The full source documents are **not redistributed**. Users who want to reproduce corpus-dependent retrieval and generation experiments must provide their own local source documents and ensure that their use complies with the original licenses and access conditions.
 
-## Repository Structure
+## Repository structure
 
 ```text
 .
 ├── preprocessing/
-│   └── qfr_dataset/
-│       ├── preprocess_pdfs.py
-│       ├── chunking.py
-│       ├── normalize_errors.py
-│       ├── dataset_stats.py
-│       └── text_normalization.json
+│   ├── qfr_dataset/
+│   │   ├── preprocess_pdfs.py
+│   │   ├── chunking.py
+│   │   ├── normalize_errors.py
+│   │   ├── dataset_stats.py
+│   │   └── text_normalization.json
+│   └── bioasq_dataset/
+│       ├── bioasq_make_subset.py
+│       ├── bioasq_fetch_pubmed.py
+│       └── chunking.py
 │
 ├── src/
 │   ├── retrieval/
@@ -115,10 +135,14 @@ The full source documents are **not redistributed** in this repository or in the
 │   │
 │   ├── rag_pipeline/
 │   │   ├── gen_from_trace.py
+│   │   ├── gen_closed_book.py
 │   │   ├── gen_oracle.py
-│   │   ├── evaluation.py
+│   │   ├── gen_full_corpus_alias.py
+│   │   ├── bioasq_gen_from_trace.py
 │   │   ├── evaluate_taskA.py
-│   │   ├── judge_reliability.py
+│   │   ├── evaluation.py
+│   │   ├── eval_bioasq.py
+│   │   ├── inter_judge_reliability.py
 │   │   ├── prompts.py
 │   │   ├── schema.py
 │   │   ├── corpus_store.py
@@ -135,27 +159,18 @@ The full source documents are **not redistributed** in this repository or in the
 └── README.md
 ```
 
-Generated local files such as processed corpora, indexes, retrieval traces, model outputs, and evaluation results are not included in the repository.
+Generated local files such as processed corpora, indexes, retrieval traces, model outputs, and evaluation results are intentionally not included in the repository.
 
 ## Installation
 
 Python 3.11 is recommended.
 
-Create and activate a virtual environment:
-
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate
-```
-
-Install the core dependencies:
-
-```bash
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
-
-The core requirements are sufficient for loading the dataset and running the retrieval, generation and evaluation scripts.
 
 Optional PDF/document preprocessing dependencies are separated because they are heavier:
 
@@ -163,17 +178,16 @@ Optional PDF/document preprocessing dependencies are separated because they are 
 python -m pip install -r requirements-preprocessing.txt
 ```
 
-Install these only if you want to reconstruct `corpus.chunks.jsonl` from local source documents.
+Install the preprocessing requirements only if you want to reconstruct `corpus.chunks.jsonl` from local source documents.
 
-## Expected Local Setup
+## Expected local layout
 
-A typical local setup for running experiments is:
+A typical local layout is:
 
 ```text
 data/
 ├── raw/
 │   └── source_documents/
-│
 └── processed/
     └── corpus.chunks.jsonl
 
@@ -185,45 +199,74 @@ qfr_datasets/
 
 indexes/
 outputs/
+runs/
 ```
 
-The `qfr_datasets/` directory can be downloaded from Hugging Face. The `data/raw/`, `data/processed/`, `indexes/`, and `outputs/` directories are created locally and should not be committed.
+The `data/`, `indexes/`, `outputs/`, and `runs/` directories are local working directories and should not be committed.
 
-## Preprocessing
+## API and model backends
 
-The preprocessing scripts are located in:
+The generation scripts support OpenAI-compatible API backends and local OpenAI-compatible servers. Some evaluation scripts also support Anthropic judges. For local OpenAI-compatible servers, for example vLLM, use:
+
+```bash
+export OPENAI_API_KEY=dummy
+export OPENAI_BASE_URL=http://localhost:8000/v1
+```
+
+For API-based runs, set the relevant API key in the environment or pass it through the script arguments.
+
+## Reproducing the thesis pipeline
+
+The main thesis experiments used the following standard RAG setting unless stated otherwise:
+
+```text
+BM25 + Qwen3 dense retrieval
+linear fusion with BM25 weight λ = 0.3
+Qwen3 reranking
+fixed context depth k = 10
+```
+
+The diagnostic generation settings were:
+
+- **standard RAG:** generation from retrieved and reranked evidence;
+- **closed-book:** generation without retrieved evidence;
+- **oracle:** generation from annotated gold evidence;
+- **full-corpus / citation-alias diagnostic:** generation from expanded/full-corpus traces with short prompt-local citation aliases;
+- **adversarial:** generation and evaluation on nonsensical, false-premise, and safety-critical variants.
+
+The exact output paths below are examples. You can change them as long as the next step points to the files written by the previous step.
+
+## 1. Preprocessing QFR source documents
+
+Preprocessing scripts are located in:
 
 ```text
 preprocessing/qfr_dataset/
 ```
 
-These scripts were used to process source documents, normalize text, and create section-aware corpus chunks.
+Because the source documents are not redistributed, preprocessing requires local access to the documents.
 
-Because the original source documents are not redistributed, users need to provide their own local source files if they want to reconstruct the retrieval corpus.
-
-The main processed corpus file expected by the retrieval and generation scripts is:
+The retrieval and generation scripts expect a processed corpus file such as:
 
 ```text
 data/processed/corpus.chunks.jsonl
 ```
 
-## Retrieval
+The expected chunk records contain stable chunk identifiers and text fields used by retrieval and citation evaluation.
 
-Retrieval scripts are located in:
+## 2. Build retrieval indexes
 
-```text
-src/retrieval/
+### BM25 index
+
+```bash
+python -m src.retrieval.index_bm25 \
+  --corpus data/processed/corpus.chunks.jsonl \
+  --out_dir indexes/bm25
 ```
 
-The repository supports BM25 retrieval, dense retrieval, retrieval fusion, and reranking.
+### Dense index
 
-Available dense retriever model keys are defined in:
-
-```text
-src/retrieval/models.py
-```
-
-Current model keys include:
+The dense model keys are defined in `src/retrieval/models.py`. The included retrieval model keys are:
 
 ```text
 qwen3_8b
@@ -232,28 +275,19 @@ medcpt
 cardioembed
 ```
 
-### Build a BM25 Index
-
-```bash
-python -m src.retrieval.index_bm25 \
-  --corpus data/processed/corpus.chunks.jsonl \
-  --out_dir indexes/bm25
-```
-
-### Build a Dense Index
-
 Example using Qwen3 embeddings:
 
 ```bash
 python -m src.retrieval.index_dense \
   --model_key qwen3_8b \
   --corpus data/processed/corpus.chunks.jsonl \
-  --index_root indexes/dense
+  --index_root indexes/dense \
+  --device cuda
 ```
 
-## Retrieval Evaluation
+## 3. Evaluate retrieval
 
-### Task A
+### Task A BM25 retrieval
 
 ```bash
 python -m src.retrieval.eval_retrieval \
@@ -263,10 +297,10 @@ python -m src.retrieval.eval_retrieval \
   --index_dir indexes/bm25 \
   --k_values 1,3,5,10,20 \
   --out_json outputs/retrieval/taskA_bm25_metrics.json \
-  --trace_dir outputs/retrieval/taskA_bm25_traces
+  --trace_dir outputs/retrieval/taskA_bm25
 ```
 
-### Task B
+### Task B BM25 retrieval
 
 ```bash
 python -m src.retrieval.eval_retrieval \
@@ -276,12 +310,10 @@ python -m src.retrieval.eval_retrieval \
   --index_dir indexes/bm25 \
   --k_values 1,3,5,10,20 \
   --out_json outputs/retrieval/taskB_bm25_metrics.json \
-  --trace_dir outputs/retrieval/taskB_bm25_traces
+  --trace_dir outputs/retrieval/taskB_bm25
 ```
 
-### Dense Retrieval Evaluation
-
-Example for Task A:
+### Task A dense retrieval
 
 ```bash
 python -m src.retrieval.eval_retrieval \
@@ -290,22 +322,38 @@ python -m src.retrieval.eval_retrieval \
   --mode dense \
   --index_dir indexes/dense/qwen3_8b \
   --model_key qwen3_8b \
+  --device cuda \
   --k_values 1,3,5,10,20 \
   --out_json outputs/retrieval/taskA_qwen3_metrics.json \
-  --trace_dir outputs/retrieval/taskA_qwen3_traces
+  --trace_dir outputs/retrieval/taskA_qwen3
 ```
 
-## Fusion and Reranking
+### Task B dense retrieval
 
-### Retrieval Fusion
+```bash
+python -m src.retrieval.eval_retrieval \
+  --dataset B \
+  --data_path qfr_datasets/taskB.jsonl \
+  --mode dense \
+  --index_dir indexes/dense/qwen3_8b \
+  --model_key qwen3_8b \
+  --device cuda \
+  --k_values 1,3,5,10,20 \
+  --out_json outputs/retrieval/taskB_qwen3_metrics.json \
+  --trace_dir outputs/retrieval/taskB_qwen3
+```
 
-The fusion script combines two retrieval trace files, for example BM25 and dense retrieval.
+## 4. Fusion and reranking
+
+The thesis standard retrieval setting uses BM25 + Qwen3 linear fusion with `--lambda_a 0.3`, followed by Qwen3 reranking.
+
+### Task A fusion
 
 ```bash
 python -m src.retrieval.fusion_retrieval \
   --dataset A \
-  --traces_a outputs/retrieval/taskA_bm25_traces/retrieval_traces.jsonl \
-  --traces_b outputs/retrieval/taskA_qwen3_traces/retrieval_traces.jsonl \
+  --traces_a outputs/retrieval/taskA_bm25/retrieval_traces.jsonl \
+  --traces_b outputs/retrieval/taskA_qwen3/retrieval_traces.jsonl \
   --lambda_a 0.3 \
   --k_values 1,3,5,10,20,50 \
   --out_json outputs/retrieval/taskA_fusion_metrics.json \
@@ -313,9 +361,21 @@ python -m src.retrieval.fusion_retrieval \
   --out_traces_rrf outputs/retrieval/taskA_fusion_rrf_traces.jsonl
 ```
 
-For Task B, change `--dataset A` to `--dataset B` and use the corresponding Task B trace files.
+### Task B fusion
 
-### Reranking
+```bash
+python -m src.retrieval.fusion_retrieval \
+  --dataset B \
+  --traces_a outputs/retrieval/taskB_bm25/retrieval_traces.jsonl \
+  --traces_b outputs/retrieval/taskB_qwen3/retrieval_traces.jsonl \
+  --lambda_a 0.3 \
+  --k_values 1,3,5,10,20,50 \
+  --out_json outputs/retrieval/taskB_fusion_metrics.json \
+  --out_traces_linear outputs/retrieval/taskB_fusion_linear_traces.jsonl \
+  --out_traces_rrf outputs/retrieval/taskB_fusion_rrf_traces.jsonl
+```
+
+### Task A reranking
 
 ```bash
 python -m src.retrieval.rerank_retrieval \
@@ -328,29 +388,24 @@ python -m src.retrieval.rerank_retrieval \
   --out_json outputs/retrieval/taskA_fusion_reranked_metrics.json
 ```
 
-For Task B, change `--dataset A` to `--dataset B` and use the corresponding Task B trace files.
+### Task B reranking
 
-## RAG Generation
-
-Generation scripts are located in:
-
-```text
-src/rag_pipeline/
+```bash
+python -m src.retrieval.rerank_retrieval \
+  --dataset B \
+  --in_traces outputs/retrieval/taskB_fusion_linear_traces.jsonl \
+  --out_traces outputs/retrieval/taskB_fusion_reranked_traces.jsonl \
+  --chunks_json data/processed/corpus.chunks.jsonl \
+  --top_k 50 \
+  --k_values 1,3,5,10,20,50 \
+  --out_json outputs/retrieval/taskB_fusion_reranked_metrics.json
 ```
 
-The repository supports generation from retrieved evidence traces and generation from oracle evidence.
+## 5. Standard RAG generation
 
-The generation scripts support the following backends:
+Standard RAG generation uses reranked retrieval traces and a fixed context depth of `--top_k_context 10`.
 
-```text
-openai
-openai_compat
-ollama
-```
-
-### Trace-Based Generation
-
-Example for Task A:
+### Task A standard RAG
 
 ```bash
 python -m src.rag_pipeline.gen_from_trace \
@@ -361,10 +416,10 @@ python -m src.rag_pipeline.gen_from_trace \
   --backend openai_compat \
   --lm_model MODEL_NAME \
   --top_k_context 10 \
-  --out_dir outputs/generation/taskA
+  --out_dir outputs/generation/taskA/MODEL_NAME_standard
 ```
 
-Example for Task B:
+### Task B standard RAG
 
 ```bash
 python -m src.rag_pipeline.gen_from_trace \
@@ -375,12 +430,48 @@ python -m src.rag_pipeline.gen_from_trace \
   --backend openai_compat \
   --lm_model MODEL_NAME \
   --top_k_context 10 \
-  --out_dir outputs/generation/taskB
+  --out_dir outputs/generation/taskB/MODEL_NAME_standard
 ```
 
-### Oracle-Evidence Generation
+Each generation run writes:
 
-Example for Task A:
+```text
+generations.jsonl
+generation_summary.json
+meta.json
+```
+
+## 6. Closed-book generation
+
+The closed-book setting answers without retrieved evidence. This is used as a diagnostic baseline to separate retrieval-grounded behaviour from model-internal knowledge.
+
+### Task A closed-book
+
+```bash
+python -m src.rag_pipeline.gen_closed_book \
+  --task A \
+  --dataset qfr_datasets/taskA.jsonl \
+  --backend openai_compat \
+  --lm_model MODEL_NAME \
+  --out_dir outputs/generation/taskA/MODEL_NAME_closed_book
+```
+
+### Task B closed-book
+
+```bash
+python -m src.rag_pipeline.gen_closed_book \
+  --task B \
+  --dataset qfr_datasets/taskB.jsonl \
+  --backend openai_compat \
+  --lm_model MODEL_NAME \
+  --out_dir outputs/generation/taskB/MODEL_NAME_closed_book
+```
+
+## 7. Oracle-evidence generation
+
+The oracle setting provides annotated gold evidence rather than retrieved evidence. It is used to diagnose whether generation failures remain when retrieval failure is removed.
+
+### Task A oracle
 
 ```bash
 python -m src.rag_pipeline.gen_oracle \
@@ -391,10 +482,10 @@ python -m src.rag_pipeline.gen_oracle \
   --max_oracle_chunks 10 \
   --backend openai_compat \
   --lm_model MODEL_NAME \
-  --out_dir outputs/oracle/taskA
+  --out_dir outputs/generation/taskA/MODEL_NAME_oracle
 ```
 
-Example for Task B:
+### Task B oracle
 
 ```bash
 python -m src.rag_pipeline.gen_oracle \
@@ -405,129 +496,287 @@ python -m src.rag_pipeline.gen_oracle \
   --max_oracle_chunks 10 \
   --backend openai_compat \
   --lm_model MODEL_NAME \
-  --out_dir outputs/oracle/taskB
+  --out_dir outputs/generation/taskB/MODEL_NAME_oracle
 ```
 
-For API-based models, set the required API keys in your environment or pass them through the relevant command-line arguments.
+The `all_gold` oracle mode uses all annotated gold evidence up to the context budget. For Task B, this is slot-aware: it prioritises coverage of required evidence slots.
 
-For OpenAI-compatible local servers, set:
+## 8. Full-corpus / citation-alias diagnostic generation
+
+The full-corpus diagnostic uses expanded retrieval traces and replaces long chunk identifiers in the prompt with short local citation aliases such as `C001`, `C002`, and so on. The aliases are mapped back to the original chunk IDs in `generations.jsonl`, so the normal evaluation scripts remain compatible.
+
+This run is useful for diagnosing citation and context-use behaviour under a much larger evidence set. The script expects a trace file whose `retrieved` list already contains the chunks to expose to the model.
 
 ```bash
-export OPENAI_API_KEY=dummy
-export OPENAI_BASE_URL=http://localhost:8000/v1
+python -m src.rag_pipeline.gen_full_corpus_alias \
+  --task B \
+  --trace_jsonl outputs/retrieval/taskB_full_corpus_traces.jsonl \
+  --corpus data/processed/corpus.chunks.jsonl \
+  --dataset qfr_datasets/taskB.jsonl \
+  --backend openai_compat \
+  --lm_model MODEL_NAME \
+  --top_k_context 200 \
+  --out_dir outputs/generation/taskB/MODEL_NAME_full_corpus_alias
 ```
 
-## Answer Evaluation
+Use a `--top_k_context` value that fits the context window of the model being evaluated.
 
-Evaluation scripts are located in:
+## 9. Generation evaluation
 
-```text
-src/rag_pipeline/
-```
+The evaluation scripts consume `generations.jsonl` and write per-example and global evaluation outputs.
 
-### Task A Evaluation
+### Task A evaluation
 
 ```bash
 python -m src.rag_pipeline.evaluate_taskA \
-  --generations outputs/generation/taskA/generations.jsonl \
+  --task A \
+  --generations outputs/generation/taskA/MODEL_NAME_standard/generations.jsonl \
   --dataset qfr_datasets/taskA.jsonl \
-  --out_dir outputs/evaluation/taskA \
-  --backend openai \
+  --out_dir outputs/evaluation/taskA/MODEL_NAME_standard/JUDGE_NAME \
+  --backend openai_compat \
   --lm_model JUDGE_MODEL_NAME
 ```
 
-Task A evaluation focuses on reference-based correctness and retrieval-aware answer diagnostics.
+Task A evaluation writes, among other files:
 
-### Task B Evaluation
+```text
+per_example_eval.jsonl
+global_summary.json
+taxonomy_summary.json
+eval_meta.json
+```
+
+### Task B evaluation
 
 ```bash
 python -m src.rag_pipeline.evaluation \
   --task B \
-  --generations outputs/generation/taskB/generations.jsonl \
+  --generations outputs/generation/taskB/MODEL_NAME_standard/generations.jsonl \
   --dataset qfr_datasets/taskB.jsonl \
-  --out_dir outputs/evaluation/taskB \
+  --out_dir outputs/evaluation/taskB/MODEL_NAME_standard/JUDGE_NAME \
   --run_nuggets \
-  --backend openai \
+  --backend openai_compat \
   --lm_model JUDGE_MODEL_NAME
 ```
 
-Task B evaluation supports nugget-level answer completeness. RAGAS metrics are available through `--run_ragas`, but are optional.
-
-## Adversarial Evaluation
-
-Adversarial evaluation scripts are located in:
-
-```text
-src/adversarial/
-```
-
-Example for Task A adversarial generations:
+To include optional RAGAS-style faithfulness and answer-relevance metrics, add:
 
 ```bash
-python -m src.adversarial.eval_adversarial \
-  --task A \
-  --dataset qfr_datasets/taskA_adversarial.jsonl \
-  --generations outputs/adversarial/taskA/generations.jsonl \
-  --out_dir outputs/adversarial_eval/taskA \
-  --judge_model JUDGE_MODEL_NAME
+--run_ragas
 ```
 
-Example for Task B adversarial generations:
+Task B evaluation writes:
+
+```text
+per_example_eval.jsonl
+global_summary.json
+nugget_summary.json
+eval_meta.json
+```
+
+The thesis used GPT-4o-mini and Claude Haiku 4.5 as judge models and reports averaged judge scores where applicable.
+
+## 10. BioASQ validation runs
+
+BioASQ was used as a pipeline validation check. The BioASQ scripts are separate from the QFR-RAG task scripts because BioASQ uses document-level evidence and answer formats.
+
+BioASQ preprocessing utilities are located in:
+
+```text
+preprocessing/bioasq_dataset/
+```
+
+Trace-driven BioASQ generation:
+
+```bash
+python -m src.rag_pipeline.bioasq_gen_from_trace \
+  --trace_jsonl outputs/bioasq/retrieval/bioasq_fusion_traces.jsonl \
+  --corpus data/bioasq/processed/docs.jsonl \
+  --backend openai_compat \
+  --lm_model MODEL_NAME \
+  --top_k_context 10 \
+  --out_dir outputs/bioasq/generation/MODEL_NAME_standard
+```
+
+BioASQ evaluation:
+
+```bash
+python -m src.rag_pipeline.eval_bioasq \
+  --generations outputs/bioasq/generation/MODEL_NAME_standard/generations.jsonl \
+  --gold_answers data/bioasq/eval/gold_answers.jsonl \
+  --out_dir outputs/bioasq/evaluation/MODEL_NAME_standard/JUDGE_NAME \
+  --backend openai_compat \
+  --lm_model JUDGE_MODEL_NAME
+```
+
+## 11. Adversarial runs
+
+The adversarial set evaluates whether systems avoid inappropriate compliance on nonsensical, false-premise, and safety-critical questions.
+
+### Adversarial retrieval
+
+```bash
+python -m src.retrieval.run_adversarial_retrieval \
+  --taskA_dataset qfr_datasets/taskA_adversarial.jsonl \
+  --taskB_dataset qfr_datasets/taskB_adversarial.jsonl \
+  --chunks_json data/processed/corpus.chunks.jsonl \
+  --bm25_index_dir indexes/bm25 \
+  --dense_index_dir indexes/dense/qwen3_8b \
+  --dense_model_key qwen3_8b \
+  --lambda_a 0.3 \
+  --retrieve_k 50 \
+  --rerank_top_k 50 \
+  --out_root outputs/adversarial/retrieval
+```
+
+### Adversarial generation
+
+Use the adversarial retrieval traces as input to the same trace-driven generation script:
+
+```bash
+python -m src.rag_pipeline.gen_from_trace \
+  --task B \
+  --trace_jsonl outputs/adversarial/retrieval/taskB/retrieval/rerank_qwen3_fusion_lambda0.3/retrieval_traces.jsonl \
+  --corpus data/processed/corpus.chunks.jsonl \
+  --dataset qfr_datasets/taskB_adversarial.jsonl \
+  --backend openai_compat \
+  --lm_model MODEL_NAME \
+  --top_k_context 10 \
+  --out_dir outputs/adversarial/generation/taskB/MODEL_NAME
+```
+
+Run the same command with `--task A` and the Task A adversarial files for Task-A-derived adversarial questions.
+
+### Adversarial evaluation
 
 ```bash
 python -m src.adversarial.eval_adversarial \
   --task B \
   --dataset qfr_datasets/taskB_adversarial.jsonl \
-  --generations outputs/adversarial/taskB/generations.jsonl \
-  --out_dir outputs/adversarial_eval/taskB \
+  --generations outputs/adversarial/generation/taskB/MODEL_NAME/generations.jsonl \
+  --out_dir outputs/adversarial/evaluation/taskB/MODEL_NAME/JUDGE_NAME \
   --judge_model JUDGE_MODEL_NAME
 ```
 
-The adversarial evaluation measures whether model responses handle unsupported, false-premise, nonsensical, and safety-critical questions appropriately.
-
-## Judge Reliability
-
-Judge agreement and reliability analysis scripts are located in:
+This writes:
 
 ```text
-src/rag_pipeline/judge_reliability.py
+adversarial_eval_per_item.csv
+adversarial_eval_by_group.csv
 ```
 
-These scripts were used to compare evaluation outputs across judge models.
+## 12. Inter-judge reliability
 
-## Reproducibility Notes
+The reliability script is intentionally generic. It does not guess model names, suffixes, or judge folders. Instead, it compares explicit judge-output files or directories.
 
-When reporting results with QFR-RAG, please specify:
+Direct example for Task A:
 
-* the retrieval corpus used;
-* the source documents included;
-* the chunking strategy;
-* the retriever model;
-* the reranker model, if used;
-* the retrieval depth;
-* the generation model;
-* the prompt setting;
-* whether the system used retrieved evidence or oracle evidence;
-* the judge model used for evaluation.
+```bash
+python -m src.rag_pipeline.inter_judge_reliability \
+  --judge-a outputs/evaluation/taskA/MODEL_NAME_standard/gpt4o_mini/per_example_eval.jsonl \
+  --judge-b outputs/evaluation/taskA/MODEL_NAME_standard/haiku45/per_example_eval.jsonl \
+  --name taskA_MODEL_NAME_standard \
+  --id-field id \
+  --categorical-metrics taskA_judge.judge_correct taskA_taxonomy.taxonomy_case \
+  --out-dir outputs/inter_judge_reliability/taskA_MODEL_NAME_standard
+```
 
-Because the original source documents are not redistributed, retrieval results may depend on the reconstructed corpus and preprocessing choices.
+Direct example for Task B:
 
-## Intended Use
+```bash
+python -m src.rag_pipeline.inter_judge_reliability \
+  --judge-a outputs/evaluation/taskB/MODEL_NAME_standard/gpt4o_mini/per_example_eval.jsonl \
+  --judge-b outputs/evaluation/taskB/MODEL_NAME_standard/haiku45/per_example_eval.jsonl \
+  --name taskB_MODEL_NAME_standard \
+  --id-field id \
+  --scalar-metrics nuggets.macro_avg_strict_recall nuggets.macro_avg_soft_recall \
+  --categorical-metrics nuggets.question_taxonomy_case \
+  --out-dir outputs/inter_judge_reliability/taskB_MODEL_NAME_standard
+```
+
+For many runs, use a manifest CSV:
+
+```csv
+name,judge_a,judge_b,id_field,scalar_metrics,categorical_metrics,subgroup_fields
+taskA_gpt4o_standard,outputs/evaluation/taskA/gpt4o_standard/gpt4o_mini/per_example_eval.jsonl,outputs/evaluation/taskA/gpt4o_standard/haiku45/per_example_eval.jsonl,id,,"taskA_judge.judge_correct,taskA_taxonomy.taxonomy_case",
+taskB_gpt4o_standard,outputs/evaluation/taskB/gpt4o_standard/gpt4o_mini/per_example_eval.jsonl,outputs/evaluation/taskB/gpt4o_standard/haiku45/per_example_eval.jsonl,id,"nuggets.macro_avg_strict_recall,nuggets.macro_avg_soft_recall",nuggets.question_taxonomy_case,
+advB_gpt4o,outputs/adversarial/evaluation/taskB/gpt4o/gpt4o_mini/adversarial_eval_per_item.csv,outputs/adversarial/evaluation/taskB/gpt4o/haiku45/adversarial_eval_per_item.csv,id,,"acceptable,paper_behavior,primary_failure_mode",adversarial_category
+```
+
+Run:
+
+```bash
+python -m src.rag_pipeline.inter_judge_reliability \
+  --manifest outputs/inter_judge_reliability/manifest.csv \
+  --out-dir outputs/inter_judge_reliability
+```
+
+The reliability script computes:
+
+- exact agreement;
+- disagreement rate;
+- Cohen's kappa;
+- PABAK;
+- Pearson correlation for scalar metrics;
+- Spearman correlation for scalar metrics;
+- mean absolute difference;
+- categorical disagreement files;
+- scalar large-disagreement files.
+
+## Output conventions
+
+Most generation scripts write:
+
+```text
+generations.jsonl
+generation_summary.json
+meta.json
+```
+
+Most evaluation scripts write:
+
+```text
+per_example_eval.jsonl
+global_summary.json
+eval_meta.json
+```
+
+Adversarial evaluation writes CSV files, and inter-judge reliability writes summary CSV/JSON files plus disagreement files.
+
+## Reproducibility notes
+
+When reporting QFR-RAG results, specify:
+
+- the source corpus and preprocessing version;
+- the chunking strategy;
+- the retriever and index used;
+- fusion method and fusion weight;
+- reranker model and reranking depth;
+- final context depth used for generation;
+- generation model and backend;
+- prompt setting;
+- whether the run is standard RAG, closed-book, oracle, full-corpus, or adversarial;
+- judge model(s) used for evaluation;
+- whether scores are single-judge or averaged across judges.
+
+Because the original QFR source documents are not redistributed, corpus-dependent retrieval and generation results may vary if users reconstruct the corpus differently.
+
+## Intended use
 
 QFR-RAG is intended for research on:
 
-* evidence retrieval;
-* reranking;
-* grounded question answering;
-* citation grounding;
-* answer completeness;
-* abstention;
-* adversarial robustness;
-* technical-medical RAG evaluation.
+- evidence retrieval;
+- reranking;
+- grounded question answering;
+- citation grounding;
+- answer completeness;
+- abstention behaviour;
+- adversarial robustness;
+- technical-medical RAG evaluation.
 
-The resource is intended as a diagnostic benchmark, not as a general medical QA dataset.
+The resource is intended as a diagnostic evaluation benchmark, not as a general medical QA dataset.
 
-## Out-of-Scope Use
+## Out-of-scope use
 
 QFR-RAG should not be used as a source of medical advice, clinical decision support, or procedural guidance. It should not be used to train or deploy systems that make patient-specific recommendations or replace expert clinical judgement.
 
@@ -545,9 +794,9 @@ The original QFR source documents are not redistributed in this repository or in
 
 ## Citation
 
-A citation will be added once the associated QFR-RAG paper is publicly available.
+A citation will be added once the associated thesis or paper is publicly available.
 
-If you use this repository or dataset before the paper is available, please cite the GitHub repository and Hugging Face dataset URL.
+If you use this repository or dataset before a formal publication is available, please cite the GitHub repository and the Hugging Face dataset URL.
 
 ## Author
 
